@@ -99,38 +99,74 @@ with tab4:
     st.info("**Insight:** Titik-titik merah mengidentifikasi waktu spesifik terjadinya anomali kekeruhan tinggi yang memerlukan perhatian lebih lanjut.")
 
 # --- TAB 5: PERBANDINGAN BATAS AMAN (Q4) ---
-with tab5:
-    st.header("Kondisi Kualitas Air Dibandingkan Batas Aman")
-    st.markdown("Analisis ini membandingkan data aktual dengan standar kualitas air (Batas Aman).")
-    
-    # Menentukan Ambang Batas (Thresholds)
-    limits = {
-        'pH': (6.5, 8.5),
-        'Dissolved Oxygen': 4.0, # Minimal 4 mg/L
-        'Temperature': 32.0,      # Maksimal 32 C
-        'Turbidity': 50.0         # Maksimal 50 FNU
-    }
-    
-    # Menghitung Persentase Kepatuhan
-    status = {
-        'pH': ((df['pH'] >= limits['pH'][0]) & (df['pH'] <= limits['pH'][1])).mean() * 100,
-        'Oksigen (DO)': (df['Dissolved Oxygen'] >= limits['Dissolved Oxygen']).mean() * 100,
-        'Suhu': (df['Temperature'] <= limits['Temperature']).mean() * 100,
-        'Kekeruhan': (df['Turbidity'] <= limits['Turbidity']).mean() * 100
-    }
-    
-    # Visualisasi dengan Bar Chart
-    fig5, ax5 = plt.subplots(figsize=(10, 6))
-    colors = ['green' if v > 80 else 'orange' for v in status.values()]
-    sns.barplot(x=list(status.keys()), y=list(status.values()), palette=colors, ax=ax5)
-    ax5.axhline(100, color='black', linestyle='--')
-    ax5.set_ylabel("Persentase Data Aman (%)")
-    ax5.set_ylim(0, 110)
-    st.pyplot(fig5)
-    
-    st.info(f"""
-    **Insight Pertanyaan 4:** - **pH**: {status['pH']:.1f}% data berada dalam rentang aman (6.5 - 8.5).
-    - **Oksigen**: {status['Oksigen (DO)']:.1f}% data memenuhi syarat minimal 4 mg/L.
-    - **Suhu**: {status['Suhu']:.1f}% data berada di bawah batas maksimal 32°C.
-    - **Kekeruhan**: {status['Kekeruhan']:.1f}% data berada di bawah batas maksimal 50 FNU.
-    """)
+with tab5:params = ['Temperature', 'Dissolved Oxygen', 'pH', 'Turbidity']
+
+thresholds = {}
+
+for col in params:
+    if col == 'Dissolved Oxygen':
+        thresholds[col] = {
+            'warning': df[col].quantile(0.10),
+            'critical': df[col].quantile(0.05)
+        }
+    else:
+        thresholds[col] = {
+            'warning': df[col].quantile(0.90),
+            'critical': df[col].quantile(0.95)
+        }
+
+def classify(val, col):
+    if col == 'Dissolved Oxygen':
+        if val < thresholds[col]['critical']:
+            return 'critical'
+        elif val < thresholds[col]['warning']:
+            return 'warning'
+        else:
+            return 'normal'
+    else:
+        if val > thresholds[col]['critical']:
+            return 'critical'
+        elif val > thresholds[col]['warning']:
+            return 'warning'
+        else:
+            return 'normal'
+
+for col in params:
+    df[col + '_level'] = df[col].apply(lambda x: classify(x, col))
+
+level_cols = [col + '_level' for col in params]
+
+def overall_status(row):
+    if 'critical' in row.values:
+        return 'critical'
+    elif 'warning' in row.values:
+        return 'warning'
+    else:
+        return 'normal'
+
+df['overall_status'] = df[level_cols].apply(overall_status, axis=1)
+
+overall_pct = df['overall_status'].value_counts(normalize=True) * 100
+print("Persentase Kondisi Air:")
+print(overall_pct)
+
+import matplotlib.pyplot as plt
+
+monthly_dist = (
+    df.groupby('month')['overall_status']
+    .value_counts(normalize=True)
+    .unstack()
+    * 100
+)
+
+monthly_dist.plot(
+    kind='bar',
+    stacked=True,
+    figsize=(12,6),
+    title='Distribusi Kondisi Kualitas Air per Bulan (%)'
+)
+
+plt.ylabel('Persentase (%)')
+plt.show()
+
+st.info("**Insight:** Berdasarkan distribusi kondisi kualitas air per bulan, terlihat bahwa kategori normal mendominasi pada sebagian besar periode, terutama pada bulan ke-3, ke-8, dan ke-9 yang menunjukkan kondisi relatif stabil. Namun, terdapat peningkatan signifikan pada kondisi critical dan warning di bulan ke-2, ke-6, ke-7, ke-11, dan ke-12, yang menunjukkan adanya penurunan kualitas air pada periode tersebut. Khususnya, bulan ke-2 dan ke-12 memiliki proporsi kondisi critical yang cukup tinggi dibanding bulan lainnya, mengindikasikan potensi kejadian pencemaran atau kondisi ekstrem yang lebih sering terjadi. Pola ini menunjukkan adanya kecenderungan musiman dalam kualitas air, di mana beberapa bulan tertentu lebih rentan terhadap kondisi tidak normal sehingga memerlukan perhatian dan pemantauan yang lebih intensif.")
