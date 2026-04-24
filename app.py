@@ -4,13 +4,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # 1. PENGATURAN HALAMAN WEB
-st.set_page_config(page_title="Aqua Guard Dashboard", page_icon="🌊", layout="wide")
+st.set_page_config(page_title="Aqua Monitoring Dashboard", page_icon="🌊", layout="wide")
 sns.set_theme(style="whitegrid")
 
 # 2. JUDUL DAN DESKRIPSI
-st.title("🌊 Aqua Guard: Sistem Peringatan Dini Kualitas Air Estuari")
+st.title("🌊 Aqua Monitoring: Sistem Peringatan Dini Kualitas Air Estuari")
 st.markdown("""
-Selamat datang di dasbor **Aqua Guard**. Dasbor ini menyajikan hasil analisis data historis perairan 
+Selamat datang di dasbor **Aqua Monitoring**. Dasbor ini menyajikan hasil analisis data historis perairan 
 untuk memantau parameter fisik dan kimia air, serta mendeteksi potensi anomali yang dapat memicu krisis ekologis.
 """)
 
