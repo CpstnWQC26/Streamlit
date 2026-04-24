@@ -25,7 +25,7 @@ def load_data():
 df = load_data()
 
 # 4. TAMPILAN DATA MENTAH (15 TERATAS)
-if st.checkbox("Tampilkan 5 Data Teratas"):
+if st.checkbox("Tampilkan 15 Data Teratas"):
     st.subheader("Cuplikan Dataset Bersih")
     st.dataframe(df.head(15)) # 15 baris pertama
 
@@ -49,7 +49,7 @@ with tab1:
     # Visualisasi heatmap korelasi dari EDA
     sns.heatmap(df.corr(), annot=True, cmap='coolwarm', fmt=".2f", ax=ax1)
     st.pyplot(fig1)
-    st.info("**Insight:** Parameter seperti Salinitas dan Konduktivitas memiliki korelasi yang sangat tinggi (mendekati 1), sedangkan Oksigen Terlarut menunjukkan hubungan negatif yang kuat dengan Suhu.")
+    st.info("**Insight:** Parameter seperti Salinitas dan Konduktivitas memiliki korelasi yang sangat tinggi (mendekati 1), sedangkan Oksigen Terlarut menunjukkan hubungan negatif yang kuat dengan Suhu. Dari heatmap korelasi terlihat bahwa terdapat beberapa hubungan kuat antar parameter kualitas air. Dissolved Oxygen memiliki korelasi negatif cukup kuat dengan Temperature (sekitar -0.63), yang menunjukkan bahwa semakin tinggi suhu air, kadar oksigen terlarut cenderung menurun. Selain itu, Salinity dan Specific Conductance memiliki korelasi yang sangat tinggi (mendekati 1), menandakan keduanya hampir merepresentasikan hal yang sama sehingga berpotensi redundan. Dissolved Oxygen juga memiliki korelasi positif kuat dengan Dissolved Oxygen (%Saturation) dan cukup tinggi dengan pH, yang menunjukkan keterkaitan antar parameter kimia air. Sementara itu, variabel seperti Chlorophyll dan Turbidity cenderung memiliki korelasi lemah terhadap parameter lain, menandakan pengaruhnya lebih independen. Secara keseluruhan, pola ini menunjukkan bahwa parameter fisik seperti suhu memiliki pengaruh signifikan terhadap kondisi kimia air, sementara beberapa variabel lain bergerak lebih bebas tanpa hubungan yang kuat.")
 
 # --- TAB 2: PENGARUH ARUS TERHADAP KEKERUHAN (Q1) ---
 with tab2:
@@ -59,7 +59,7 @@ with tab2:
     sns.scatterplot(data=df, x='Average Water Speed', y='Turbidity', alpha=0.4, color='teal', ax=ax2)
     ax2.set_title('Kecepatan Arus vs Turbidity', fontweight='bold')
     st.pyplot(fig2)
-    st.info("**Insight:** Grafik ini membantu memantau apakah peningkatan kecepatan arus secara langsung memicu kenaikan sedimen atau kekeruhan di lokasi pemantauan.")
+    st.info("**Insight:** Grafik ini membantu memantau apakah peningkatan kecepatan arus secara langsung memicu kenaikan sedimen atau kekeruhan di lokasi pemantauan. Dari visualisasi hubungan antara kecepatan arus dan tingkat kekeruhan air (turbidity), terlihat bahwa tidak terdapat hubungan linear yang kuat antara kedua variabel tersebut, yang ditunjukkan oleh sebaran data yang sangat luas dan tidak membentuk pola tertentu. Meskipun garis tren menunjukkan kecenderungan sedikit meningkat (positif), hal ini sangat lemah dan tidak signifikan secara visual. Selain itu, terdapat banyak nilai turbidity tinggi yang tersebar pada berbagai tingkat kecepatan arus, yang menunjukkan bahwa kekeruhan air tidak hanya dipengaruhi oleh kecepatan arus, tetapi kemungkinan besar juga dipengaruhi oleh faktor lain seperti aktivitas sedimen, curah hujan, atau kondisi lingkungan sekitar. Dengan demikian, kecepatan arus bukan merupakan indikator utama dalam menentukan tingkat kekeruhan air pada dataset ini.")
 
 # --- TAB 3: DAMPAK SUHU TERHADAP OKSIGEN (Q2) ---
 with tab3:
@@ -83,7 +83,7 @@ with tab3:
         ax5.plot(df_harian.index, df_harian['Dissolved Oxygen'], color='tab:blue', label='Oksigen')
         st.pyplot(fig4)
         
-    st.info("**Insight:** Terlihat pola 'efek cermin'; saat suhu meningkat, kadar oksigen terlarut cenderung menurun secara signifikan, yang dapat mengancam ekosistem.")
+    st.info("**Insight:** Garis merah pada grafik 1 yang menukik tajam ke bawah membuktikan bahwa semakin panas air, kadar oksigennya semakin menipis. Ini adalah indikator krisis ekologis yang penting. Pada grafik 2 terlihat pola 'efek cermin'; saat suhu meningkat, kadar oksigen terlarut cenderung menurun secara signifikan, yang dapat mengancam ekosistem.")
 
 # --- TAB 4: DETEKSI ANOMALI TEMPORAL (Q3) ---
 with tab4:
