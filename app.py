@@ -24,21 +24,22 @@ def load_data():
 
 df = load_data()
 
-# 4. TAMPILAN DATA MENTAH (10 TERATAS)
+# 4. TAMPILAN DATA MENTAH (15 TERATAS)
 if st.checkbox("Tampilkan 5 Data Teratas"):
     st.subheader("Cuplikan Dataset Bersih")
-    st.dataframe(df.head(15)) # 10 baris pertama
+    st.dataframe(df.head(15)) # 15 baris pertama
 
 st.divider()
 
 # =========================================================
 # ANALISIS BERDASARKAN 4 PERTANYAAN & INSIGHT UTAMA
 # =========================================================
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📍 Korelasi Parameter", 
     "🌊 Arus & Kekeruhan (Q1)", 
     "🌡️ Suhu & Oksigen (Q2)", 
-    "⚠️ Deteksi Anomali (Q3)"
+    "⚠️ Deteksi Anomali (Q3)",
+    "✅ Batas Aman (Q4)"
 ])
 
 # --- TAB 1: KORELASI ANTAR PARAMETER (EDA INSIGHT) ---
