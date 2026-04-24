@@ -99,74 +99,86 @@ with tab4:
     st.info("**Insight:** Titik-titik merah mengidentifikasi waktu spesifik terjadinya anomali kekeruhan tinggi yang memerlukan perhatian lebih lanjut.")
 
 # --- TAB 5: PERBANDINGAN BATAS AMAN (Q4) ---
-with tab5:params = ['Temperature', 'Dissolved Oxygen', 'pH', 'Turbidity']
+with tab5: 
+    st.header("Kondisi Kualitas Air Dibandingkan Batas Aman")
+    
+    params = ['Temperature', 'Dissolved Oxygen', 'pH', 'Turbidity']
+    thresholds = {}
 
-thresholds = {}
+    # Menghitung kuantil untuk batas aman
+    for col in params:
+        if col == 'Dissolved Oxygen':
+            thresholds[col] = {
+                'warning': df[col].quantile(0.10),
+                'critical': df[col].quantile(0.05)
+            }
+        else:
+            thresholds[col] = {
+                'warning': df[col].quantile(0.90),
+                'critical': df[col].quantile(0.95)
+            }
 
-for col in params:
-    if col == 'Dissolved Oxygen':
-        thresholds[col] = {
-            'warning': df[col].quantile(0.10),
-            'critical': df[col].quantile(0.05)
-        }
-    else:
-        thresholds[col] = {
-            'warning': df[col].quantile(0.90),
-            'critical': df[col].quantile(0.95)
-        }
+    # Klasifikasi
+    def classify(val, col):
+        if col == 'Dissolved Oxygen':
+            if val < thresholds[col]['critical']:
+                return 'critical'
+            elif val < thresholds[col]['warning']:
+                return 'warning'
+            else:
+                return 'normal'
+        else:
+            if val > thresholds[col]['critical']:
+                return 'critical'
+            elif val > thresholds[col]['warning']:
+                return 'warning'
+            else:
+                return 'normal'
 
-def classify(val, col):
-    if col == 'Dissolved Oxygen':
-        if val < thresholds[col]['critical']:
+    for col in params:
+        df[col + '_level'] = df[col].apply(lambda x: classify(x, col))
+
+    level_cols = [col + '_level' for col in params]
+
+    def overall_status(row):
+        if 'critical' in row.values:
             return 'critical'
-        elif val < thresholds[col]['warning']:
+        elif 'warning' in row.values:
             return 'warning'
         else:
             return 'normal'
-    else:
-        if val > thresholds[col]['critical']:
-            return 'critical'
-        elif val > thresholds[col]['warning']:
-            return 'warning'
-        else:
-            return 'normal'
 
-for col in params:
-    df[col + '_level'] = df[col].apply(lambda x: classify(x, col))
+    df['overall_status'] = df[level_cols].apply(overall_status, axis=1)
 
-level_cols = [col + '_level' for col in params]
+    overall_pct = df['overall_status'].value_counts(normalize=True) * 100
+    st.subheader("Persentase Kondisi Air secara Keseluruhan")
+    st.dataframe(overall_pct.to_frame(name="Persentase (%)"))
 
-def overall_status(row):
-    if 'critical' in row.values:
-        return 'critical'
-    elif 'warning' in row.values:
-        return 'warning'
-    else:
-        return 'normal'
+    if 'month' not in df.columns:
+        df['month'] = df.index.month
 
-df['overall_status'] = df[level_cols].apply(overall_status, axis=1)
+    # Grafik
+    import matplotlib.pyplot as plt
 
-overall_pct = df['overall_status'].value_counts(normalize=True) * 100
-print("Persentase Kondisi Air:")
-print(overall_pct)
+    monthly_dist = (
+        df.groupby('month')['overall_status']
+        .value_counts(normalize=True)
+        .unstack()
+        * 100
+    )
 
-import matplotlib.pyplot as plt
+    # Simpan plot ke dalam variabel figure (fig)
+    fig, ax = plt.subplots(figsize=(12,6))
+    monthly_dist.plot(
+        kind='bar',
+        stacked=True,
+        ax=ax,
+        title='Distribusi Kondisi Kualitas Air per Bulan (%)'
+    )
 
-monthly_dist = (
-    df.groupby('month')['overall_status']
-    .value_counts(normalize=True)
-    .unstack()
-    * 100
-)
-
-monthly_dist.plot(
-    kind='bar',
-    stacked=True,
-    figsize=(12,6),
-    title='Distribusi Kondisi Kualitas Air per Bulan (%)'
-)
-
-plt.ylabel('Persentase (%)')
-plt.show()
-
+    ax.set_ylabel('Persentase (%)')
+    ax.set_xlabel('Bulan')
+    
+    st.pyplot(fig)
+    
 st.info("**Insight:** Berdasarkan distribusi kondisi kualitas air per bulan, terlihat bahwa kategori normal mendominasi pada sebagian besar periode, terutama pada bulan ke-3, ke-8, dan ke-9 yang menunjukkan kondisi relatif stabil. Namun, terdapat peningkatan signifikan pada kondisi critical dan warning di bulan ke-2, ke-6, ke-7, ke-11, dan ke-12, yang menunjukkan adanya penurunan kualitas air pada periode tersebut. Khususnya, bulan ke-2 dan ke-12 memiliki proporsi kondisi critical yang cukup tinggi dibanding bulan lainnya, mengindikasikan potensi kejadian pencemaran atau kondisi ekstrem yang lebih sering terjadi. Pola ini menunjukkan adanya kecenderungan musiman dalam kualitas air, di mana beberapa bulan tertentu lebih rentan terhadap kondisi tidak normal sehingga memerlukan perhatian dan pemantauan yang lebih intensif.")
