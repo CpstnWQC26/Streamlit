@@ -98,7 +98,7 @@ with tab4:
     st.info("**Insight:** Titik-titik merah mengidentifikasi waktu spesifik terjadinya anomali kekeruhan tinggi yang memerlukan perhatian lebih lanjut.")
 
 # --- TAB 5: PERBANDINGAN BATAS AMAN (Q4) ---
-with tabs[4]:
+with tab5:
     st.header("Kondisi Kualitas Air Dibandingkan Batas Aman")
     st.markdown("Analisis ini membandingkan data aktual dengan standar kualitas air (Batas Aman).")
     
