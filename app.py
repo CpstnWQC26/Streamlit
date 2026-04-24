@@ -18,7 +18,7 @@ untuk memantau parameter fisik dan kimia air, serta mendeteksi potensi anomali y
 @st.cache_data
 def load_data():
     # File CSV
-    df = pd.read_csv("water_quality_ready_for_AI.csv")
+    df = pd.read_csv("water_quality_ready.csv")
     df['Timestamp'] = pd.to_datetime(df['Timestamp'])
     df.set_index('Timestamp', inplace=True)
     return df
