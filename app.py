@@ -1,184 +1,455 @@
+
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+import numpy as np
+import plotly.express as px
+from pathlib import Path
 
-# 1. KONFIGURASI HALAMAN
-st.set_page_config(page_title="Aqua Monitoring Dashboard", page_icon="🌊", layout="wide")
-sns.set_theme(style="whitegrid")
+st.set_page_config(
+    page_title="Insight & Kesimpulan Kualitas Air",
+    page_icon="💧",
+    layout="wide"
+)
 
-# 2. JUDUL DAN PENGANTAR
-st.title("🌊 Aqua Monitoring: Monitoring Kualitas Air")
-st.markdown("""
-Sistem ini menyajikan analisis mendalam dari data perairan untuk mendeteksi potensi krisis ekologis secara proaktif.
-""")
+# ============================================================
+# KONFIGURASI FILE DATASET
+# ============================================================
 
-# 3. MEMUAT DATA
+DATA_PATH = Path("dataset.csv")
+
+# ============================================================
+# FUNCTION
+# ============================================================
+
 @st.cache_data
 def load_data():
-    # Menggunakan dataset yang sudah dibersihkan sebelumnya
-    df = pd.read_csv("water_quality_ready.csv")
-    df['Timestamp'] = pd.to_datetime(df['Timestamp'])
-    df.set_index('Timestamp', inplace=True)
-    return df
+    if not DATA_PATH.exists():
+        st.error(
+            "File dataset.csv tidak ditemukan. "
+            "Letakkan file dataset dengan nama dataset.csv di folder yang sama dengan app ini."
+        )
+        st.stop()
 
-df = load_data()
+    return pd.read_csv(DATA_PATH, low_memory=False)
 
-# 4. TAMPILAN DATA MENTAH (15 TERATAS)
-if st.checkbox("Tampilkan 15 Data Teratas"):
-    st.subheader("Cuplikan Dataset Bersih")
-    st.dataframe(df.head(15)) # 15 baris pertama
+def preprocess_data(df):
+    df = df.copy()
 
-st.divider()
+    if "Timestamp" in df.columns:
+        df = df[df["Timestamp"] != "Units"].copy()
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
 
-# =========================================================
-# ANALISIS BERDASARKAN 4 PERTANYAAN & INSIGHT UTAMA
-# =========================================================
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📍 Korelasi Parameter", 
-    "🌊 Arus & Kekeruhan (Q1)", 
-    "🌡️ Suhu & Oksigen (Q2)", 
-    "⚠️ Deteksi Anomali (Q3)",
-    "✅ Batas Aman (Q4)"
-])
+    drop_cols = ["_id", "Record number", "quality"]
+    df = df.drop(columns=[col for col in drop_cols if col in df.columns], errors="ignore")
 
-# --- TAB 1: KORELASI ANTAR PARAMETER (EDA INSIGHT) ---
-with tab1:
-    st.header("Analisis Hubungan Antar Seluruh Parameter")
-    fig1, ax1 = plt.subplots(figsize=(10, 8))
-    # Visualisasi heatmap korelasi dari EDA
-    sns.heatmap(df.corr(), annot=True, cmap='coolwarm', fmt=".2f", ax=ax1)
-    st.pyplot(fig1)
-    st.info("**Insight:** Parameter seperti Salinitas dan Konduktivitas memiliki korelasi yang sangat tinggi (mendekati 1), sedangkan Oksigen Terlarut menunjukkan hubungan negatif yang kuat dengan Suhu. Dari heatmap korelasi terlihat bahwa terdapat beberapa hubungan kuat antar parameter kualitas air. Dissolved Oxygen memiliki korelasi negatif cukup kuat dengan Temperature (sekitar -0.63), yang menunjukkan bahwa semakin tinggi suhu air, kadar oksigen terlarut cenderung menurun. Selain itu, Salinity dan Specific Conductance memiliki korelasi yang sangat tinggi (mendekati 1), menandakan keduanya hampir merepresentasikan hal yang sama sehingga berpotensi redundan. Dissolved Oxygen juga memiliki korelasi positif kuat dengan Dissolved Oxygen (%Saturation) dan cukup tinggi dengan pH, yang menunjukkan keterkaitan antar parameter kimia air. Sementara itu, variabel seperti Chlorophyll dan Turbidity cenderung memiliki korelasi lemah terhadap parameter lain, menandakan pengaruhnya lebih independen. Secara keseluruhan, pola ini menunjukkan bahwa parameter fisik seperti suhu memiliki pengaruh signifikan terhadap kondisi kimia air, sementara beberapa variabel lain bergerak lebih bebas tanpa hubungan yang kuat.")
+    numeric_cols = [
+        "Average Water Speed",
+        "Average Water Direction",
+        "Chlorophyll",
+        "Temperature",
+        "Dissolved Oxygen",
+        "Dissolved Oxygen (%Saturation)",
+        "pH",
+        "Salinity",
+        "Specific Conductance",
+        "Turbidity"
+    ]
 
-# --- TAB 2: PENGARUH ARUS TERHADAP KEKERUHAN (Q1) ---
-with tab2:
-    st.header("Bagaimana pengaruh kecepatan arus terhadap tingkat kekeruhan air?")
-    fig2, ax2 = plt.subplots(figsize=(10, 6))
-    # Scatter plot Arus vs Kekeruhan
-    sns.scatterplot(data=df, x='Average Water Speed', y='Turbidity', alpha=0.4, color='teal', ax=ax2)
-    ax2.set_title('Kecepatan Arus vs Turbidity', fontweight='bold')
-    st.pyplot(fig2)
-    st.info("**Insight:** Grafik ini membantu memantau apakah peningkatan kecepatan arus secara langsung memicu kenaikan sedimen atau kekeruhan di lokasi pemantauan. Dari visualisasi hubungan antara kecepatan arus dan tingkat kekeruhan air (turbidity), terlihat bahwa tidak terdapat hubungan linear yang kuat antara kedua variabel tersebut, yang ditunjukkan oleh sebaran data yang sangat luas dan tidak membentuk pola tertentu. Meskipun garis tren menunjukkan kecenderungan sedikit meningkat (positif), hal ini sangat lemah dan tidak signifikan secara visual. Selain itu, terdapat banyak nilai turbidity tinggi yang tersebar pada berbagai tingkat kecepatan arus, yang menunjukkan bahwa kekeruhan air tidak hanya dipengaruhi oleh kecepatan arus, tetapi kemungkinan besar juga dipengaruhi oleh faktor lain seperti aktivitas sedimen, curah hujan, atau kondisi lingkungan sekitar. Dengan demikian, kecepatan arus bukan merupakan indikator utama dalam menentukan tingkat kekeruhan air pada dataset ini.")
+    numeric_cols = [col for col in numeric_cols if col in df.columns]
 
-# --- TAB 3: DAMPAK SUHU TERHADAP OKSIGEN (Q2) ---
-with tab3:
-    st.header("Seberapa besar dampak kenaikan suhu terhadap kadar oksigen?")
-    col_a, col_b = st.columns(2)
-    
-    with col_a:
-        # Regplot Suhu vs DO
-        fig3, ax3 = plt.subplots(figsize=(8, 5))
-        sns.regplot(data=df, x='Temperature', y='Dissolved Oxygen', 
-                    scatter_kws={'alpha':0.2, 'color':'teal'}, 
-                    line_kws={'color':'red', 'linewidth':3}, ax=ax3)
-        st.pyplot(fig3)
-        
-    with col_b:
-        # Tren harian Suhu & DO
-        df_harian = df.resample('D').mean()
-        fig4, ax4 = plt.subplots(figsize=(8, 5))
-        ax4.plot(df_harian.index, df_harian['Temperature'], color='tab:red', label='Suhu')
-        ax5 = ax4.twinx()
-        ax5.plot(df_harian.index, df_harian['Dissolved Oxygen'], color='tab:blue', label='Oksigen')
-        st.pyplot(fig4)
-        
-    st.info("**Insight:** Garis merah pada grafik 1 yang menukik tajam ke bawah membuktikan bahwa semakin panas air, kadar oksigennya semakin menipis. Ini adalah indikator krisis ekologis yang penting. Pada grafik 2 terlihat pola 'efek cermin'; saat suhu meningkat, kadar oksigen terlarut cenderung menurun secara signifikan, yang dapat mengancam ekosistem.")
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
-# --- TAB 4: DETEKSI ANOMALI TEMPORAL (Q3) ---
-with tab4:
-    st.header("Pola Waktu Terjadinya Lonjakan Kekeruhan yang Tidak Wajar")
-    fig5, ax6 = plt.subplots(figsize=(12, 6))
-    # Line chart dengan penanda anomali/outlier
-    plt.plot(df.index, df['Turbidity'], color='gray', label='Normal', alpha=0.5)
-    batas_ekstrem = df['Turbidity'].quantile(0.99)
-    outliers = df[df['Turbidity'] > batas_ekstrem]
-    plt.scatter(outliers.index, outliers['Turbidity'], color='red', label='Anomali (Extreme)', zorder=5)
-    plt.legend()
-    st.pyplot(fig5)
-    st.info("**Insight:** Titik-titik merah mengidentifikasi waktu spesifik terjadinya anomali kekeruhan tinggi yang memerlukan perhatian lebih lanjut.")
+    if "Timestamp" in df.columns:
+        df = df.sort_values("Timestamp").reset_index(drop=True)
 
-# --- TAB 5: PERBANDINGAN BATAS AMAN (Q4) ---
-with tab5: 
-    st.header("Kondisi Kualitas Air Dibandingkan Batas Aman")
-    
-    params = ['Temperature', 'Dissolved Oxygen', 'pH', 'Turbidity']
+    for col in numeric_cols:
+        df[col] = df[col].interpolate(method="linear", limit_direction="both")
+        df[col] = df[col].fillna(df[col].median())
+
+    df_capped = df.copy()
+
+    for col in numeric_cols:
+        lower = df_capped[col].quantile(0.01)
+        upper = df_capped[col].quantile(0.99)
+        df_capped[col] = df_capped[col].clip(lower=lower, upper=upper)
+
+    if "Timestamp" in df_capped.columns:
+        df_capped["hour"] = df_capped["Timestamp"].dt.hour
+        df_capped["date"] = df_capped["Timestamp"].dt.date
+        df_capped["month"] = df_capped["Timestamp"].dt.month
+
+    return df_capped, numeric_cols
+
+def create_status(df):
+    df = df.copy()
+
+    params = ["Temperature", "Dissolved Oxygen", "pH", "Turbidity"]
+    params = [col for col in params if col in df.columns]
+
     thresholds = {}
 
-    # Menghitung kuantil untuk batas aman
     for col in params:
-        if col == 'Dissolved Oxygen':
+        if col == "Dissolved Oxygen":
             thresholds[col] = {
-                'warning': df[col].quantile(0.10),
-                'critical': df[col].quantile(0.05)
+                "warning": df[col].quantile(0.10),
+                "critical": df[col].quantile(0.05)
             }
         else:
             thresholds[col] = {
-                'warning': df[col].quantile(0.90),
-                'critical': df[col].quantile(0.95)
+                "warning": df[col].quantile(0.90),
+                "critical": df[col].quantile(0.95)
             }
 
-    # Klasifikasi
     def classify(val, col):
-        if col == 'Dissolved Oxygen':
-            if val < thresholds[col]['critical']:
-                return 'critical'
-            elif val < thresholds[col]['warning']:
-                return 'warning'
+        if col == "Dissolved Oxygen":
+            if val < thresholds[col]["critical"]:
+                return "critical"
+            elif val < thresholds[col]["warning"]:
+                return "warning"
             else:
-                return 'normal'
+                return "normal"
         else:
-            if val > thresholds[col]['critical']:
-                return 'critical'
-            elif val > thresholds[col]['warning']:
-                return 'warning'
+            if val > thresholds[col]["critical"]:
+                return "critical"
+            elif val > thresholds[col]["warning"]:
+                return "warning"
             else:
-                return 'normal'
+                return "normal"
+
+    level_cols = []
 
     for col in params:
-        df[col + '_level'] = df[col].apply(lambda x: classify(x, col))
-
-    level_cols = [col + '_level' for col in params]
+        level_col = col + "_level"
+        df[level_col] = df[col].apply(lambda x: classify(x, col))
+        level_cols.append(level_col)
 
     def overall_status(row):
-        if 'critical' in row.values:
-            return 'critical'
-        elif 'warning' in row.values:
-            return 'warning'
+        if "critical" in row.values:
+            return "critical"
+        elif "warning" in row.values:
+            return "warning"
         else:
-            return 'normal'
+            return "normal"
 
-    df['overall_status'] = df[level_cols].apply(overall_status, axis=1)
+    df["overall_status"] = df[level_cols].apply(overall_status, axis=1)
 
-    overall_pct = df['overall_status'].value_counts(normalize=True) * 100
-    st.subheader("Persentase Kondisi Air secara Keseluruhan")
-    st.dataframe(overall_pct.to_frame(name="Persentase (%)"))
+    return df, thresholds, level_cols
 
-    if 'month' not in df.columns:
-        df['month'] = df.index.month
+def detect_anomaly(df):
+    df = df.copy()
 
-    # Grafik
-    import matplotlib.pyplot as plt
+    if "Turbidity" not in df.columns:
+        return df, None
 
-    monthly_dist = (
-        df.groupby('month')['overall_status']
-        .value_counts(normalize=True)
-        .unstack()
-        * 100
+    q1 = df["Turbidity"].quantile(0.25)
+    q3 = df["Turbidity"].quantile(0.75)
+    iqr = q3 - q1
+    upper_limit = q3 + 1.5 * iqr
+
+    df["turbidity_anomaly"] = df["Turbidity"] > upper_limit
+
+    return df, upper_limit
+
+# ============================================================
+# MAIN
+# ============================================================
+
+st.title("Dashboard Insight dan Kesimpulan Kualitas Air")
+
+st.markdown(
+    """
+Mohon tunggu sebentar, dashboard sedang memproses data dan menghasilkan insight utama berdasarkan dataset kualitas air yang telah disediakan.
+"""
+)
+
+df_raw = load_data()
+df, numeric_cols = preprocess_data(df_raw)
+df, thresholds, level_cols = create_status(df)
+df, turbidity_upper_limit = detect_anomaly(df)
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+st.sidebar.title("💧 Insight Dashboard")
+st.sidebar.success("Dataset berhasil dibaca dari dataset.csv")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown(
+    f"""
+**Ukuran dataset:**
+
+- Baris: `{df.shape[0]:,}`
+- Kolom: `{df.shape[1]:,}`
+"""
+)
+
+# ============================================================
+# KPI
+# ============================================================
+
+st.header("Ringkasan Utama")
+
+total_data = len(df)
+normal_count = int((df["overall_status"] == "normal").sum())
+warning_count = int((df["overall_status"] == "warning").sum())
+critical_count = int((df["overall_status"] == "critical").sum())
+anomaly_count = int(df["turbidity_anomaly"].sum()) if "turbidity_anomaly" in df.columns else 0
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("Total Data", f"{total_data:,}")
+col2.metric("Normal", f"{normal_count:,}")
+col3.metric("Warning", f"{warning_count:,}")
+col4.metric("Critical", f"{critical_count:,}")
+
+col5, col6 = st.columns(2)
+col5.metric("Anomali Turbidity", f"{anomaly_count:,}")
+col6.metric("Persentase Anomali", f"{(anomaly_count / total_data * 100):.2f}%")
+
+# ============================================================
+# INSIGHT 1
+# ============================================================
+
+st.header("Insight 1: Kondisi Umum Kualitas Air")
+
+status_count = (
+    df["overall_status"]
+    .value_counts()
+    .reindex(["normal", "warning", "critical"])
+    .fillna(0)
+    .reset_index()
+)
+
+status_count.columns = ["Status", "Jumlah"]
+
+fig_status = px.bar(
+    status_count,
+    x="Status",
+    y="Jumlah",
+    color="Status",
+    title="Distribusi Status Kualitas Air",
+    text="Jumlah"
+)
+
+st.plotly_chart(fig_status, use_container_width=True)
+
+dominant_status = status_count.sort_values("Jumlah", ascending=False).iloc[0]["Status"]
+
+st.markdown(
+    f"""
+**Insight:** Status kualitas air yang paling dominan adalah **{dominant_status}**.
+Hal ini menunjukkan bahwa mayoritas kondisi air dalam dataset berada pada kategori tersebut.
+"""
+)
+
+# ============================================================
+# INSIGHT 2
+# ============================================================
+
+st.header("Insight 2: Pengaruh Kecepatan Arus terhadap Kekeruhan Air")
+
+if "Average Water Speed" in df.columns and "Turbidity" in df.columns:
+    corr_speed_turbidity = df["Average Water Speed"].corr(df["Turbidity"])
+
+    fig_speed = px.scatter(
+        df,
+        x="Average Water Speed",
+        y="Turbidity",
+        trendline="ols",
+        title=f"Hubungan Kecepatan Arus dengan Turbidity | Korelasi: {corr_speed_turbidity:.3f}"
     )
 
-    # Simpan plot ke dalam variabel figure (fig)
-    fig, ax = plt.subplots(figsize=(12,6))
-    monthly_dist.plot(
-        kind='bar',
-        stacked=True,
-        ax=ax,
-        title='Distribusi Kondisi Kualitas Air per Bulan (%)'
+    st.plotly_chart(fig_speed, use_container_width=True)
+
+    if corr_speed_turbidity > 0.5:
+        speed_insight = "hubungan positif kuat"
+    elif corr_speed_turbidity > 0.2:
+        speed_insight = "hubungan positif lemah hingga sedang"
+    elif corr_speed_turbidity < -0.2:
+        speed_insight = "hubungan negatif"
+    else:
+        speed_insight = "hubungan linear yang sangat lemah"
+
+    st.markdown(
+        f"""
+**Insight:** Korelasi antara kecepatan arus dan turbidity adalah **{corr_speed_turbidity:.3f}**,
+yang menunjukkan **{speed_insight}**. Artinya, kecepatan arus belum tentu menjadi faktor utama
+yang memengaruhi kekeruhan air secara langsung.
+"""
     )
 
-    ax.set_ylabel('Persentase (%)')
-    ax.set_xlabel('Bulan')
-    
-    st.pyplot(fig)
-    
-st.info("**Insight:** Berdasarkan distribusi kondisi kualitas air per bulan, terlihat bahwa kategori normal mendominasi pada sebagian besar periode, terutama pada bulan ke-3, ke-8, dan ke-9 yang menunjukkan kondisi relatif stabil. Namun, terdapat peningkatan signifikan pada kondisi critical dan warning di bulan ke-2, ke-6, ke-7, ke-11, dan ke-12, yang menunjukkan adanya penurunan kualitas air pada periode tersebut. Khususnya, bulan ke-2 dan ke-12 memiliki proporsi kondisi critical yang cukup tinggi dibanding bulan lainnya, mengindikasikan potensi kejadian pencemaran atau kondisi ekstrem yang lebih sering terjadi. Pola ini menunjukkan adanya kecenderungan musiman dalam kualitas air, di mana beberapa bulan tertentu lebih rentan terhadap kondisi tidak normal sehingga memerlukan perhatian dan pemantauan yang lebih intensif.")
+# ============================================================
+# INSIGHT 3
+# ============================================================
+
+st.header("Insight 3: Dampak Suhu terhadap Dissolved Oxygen")
+
+if "Temperature" in df.columns and "Dissolved Oxygen" in df.columns:
+    corr_temp_do = df["Temperature"].corr(df["Dissolved Oxygen"])
+
+    fig_temp_do = px.scatter(
+        df,
+        x="Temperature",
+        y="Dissolved Oxygen",
+        trendline="ols",
+        title=f"Hubungan Temperature dengan Dissolved Oxygen | Korelasi: {corr_temp_do:.3f}"
+    )
+
+    st.plotly_chart(fig_temp_do, use_container_width=True)
+
+    if corr_temp_do < -0.5:
+        temp_insight = "kenaikan suhu berkaitan kuat dengan penurunan kadar oksigen"
+    elif corr_temp_do < -0.2:
+        temp_insight = "kenaikan suhu cenderung berkaitan dengan penurunan kadar oksigen"
+    elif corr_temp_do > 0.2:
+        temp_insight = "kenaikan suhu cenderung berkaitan dengan kenaikan kadar oksigen"
+    else:
+        temp_insight = "hubungan antara suhu dan dissolved oxygen relatif lemah"
+
+    st.markdown(
+        f"""
+**Insight:** Korelasi antara Temperature dan Dissolved Oxygen adalah **{corr_temp_do:.3f}**.
+Berdasarkan nilai tersebut, **{temp_insight}**.
+"""
+    )
+
+# ============================================================
+# INSIGHT 4
+# ============================================================
+
+st.header("Insight 4: Pola Waktu Anomali Turbidity")
+
+if "hour" in df.columns and "turbidity_anomaly" in df.columns:
+    hourly_anomaly = (
+        df.groupby("hour")["turbidity_anomaly"]
+        .agg(anomaly_count="sum", total_data="count", anomaly_rate="mean")
+        .reset_index()
+    )
+
+    hourly_anomaly["anomaly_rate_percent"] = hourly_anomaly["anomaly_rate"] * 100
+
+    fig_hour_anomaly = px.line(
+        hourly_anomaly,
+        x="hour",
+        y="anomaly_count",
+        markers=True,
+        title="Jumlah Anomali Turbidity Berdasarkan Jam"
+    )
+
+    st.plotly_chart(fig_hour_anomaly, use_container_width=True)
+
+    top_hour = hourly_anomaly.sort_values("anomaly_count", ascending=False).iloc[0]
+
+    st.markdown(
+        f"""
+**Insight:** Anomali turbidity paling banyak terjadi pada jam **{int(top_hour['hour'])}**,
+dengan jumlah anomali sebanyak **{int(top_hour['anomaly_count'])}** data.
+"""
+    )
+
+# ============================================================
+# INSIGHT 5
+# ============================================================
+
+st.header("Insight 5: Parameter yang Paling Sering Memicu Warning")
+
+warning_summary = {}
+
+for col in ["Temperature", "Dissolved Oxygen", "pH", "Turbidity"]:
+    level_col = col + "_level"
+    if level_col in df.columns:
+        warning_summary[col] = int((df[level_col] == "warning").sum())
+
+warning_df = (
+    pd.DataFrame({
+        "Parameter": list(warning_summary.keys()),
+        "Jumlah Warning": list(warning_summary.values())
+    })
+    .sort_values("Jumlah Warning", ascending=False)
+)
+
+fig_warning = px.bar(
+    warning_df,
+    x="Jumlah Warning",
+    y="Parameter",
+    orientation="h",
+    title="Jumlah Warning Berdasarkan Parameter"
+)
+
+fig_warning.update_layout(yaxis={"categoryorder": "total ascending"})
+st.plotly_chart(fig_warning, use_container_width=True)
+
+top_warning_param = warning_df.iloc[0]["Parameter"] if len(warning_df) > 0 else "-"
+
+st.markdown(
+    f"""
+**Insight:** Parameter yang paling sering memicu status warning adalah **{top_warning_param}**.
+Parameter ini perlu menjadi perhatian utama dalam sistem pemantauan kualitas air.
+"""
+)
+
+# ============================================================
+# INSIGHT 6
+# ============================================================
+
+st.header("Insight 6: Tren Kondisi Kualitas Air Harian")
+
+if "date" in df.columns:
+    daily_status = (
+        df.groupby(["date", "overall_status"])
+        .size()
+        .reset_index(name="count")
+    )
+
+    daily_total = (
+        df.groupby("date")
+        .size()
+        .reset_index(name="total")
+    )
+
+    daily_status = daily_status.merge(daily_total, on="date")
+    daily_status["percentage"] = daily_status["count"] / daily_status["total"] * 100
+
+    fig_daily = px.line(
+        daily_status,
+        x="date",
+        y="percentage",
+        color="overall_status",
+        markers=True,
+        title="Tren Persentase Status Kualitas Air Harian"
+    )
+
+    st.plotly_chart(fig_daily, use_container_width=True)
+
+    st.markdown(
+        """
+**Insight:** Visualisasi ini menunjukkan perubahan komposisi status kualitas air dari hari ke hari.
+Jika persentase warning atau critical meningkat pada periode tertentu, maka periode tersebut perlu dianalisis lebih lanjut.
+"""
+    )
+
+# ============================================================
+# KESIMPULAN
+# ============================================================
+
+st.header("Kesimpulan Akhir")
+
+st.markdown(
+    f"""
+Berdasarkan hasil analisis, kondisi kualitas air dapat dipantau melalui parameter utama yaitu
+**Temperature, Dissolved Oxygen, pH, dan Turbidity**. Dari distribusi status, kategori yang paling dominan adalah
+**{dominant_status}**.
+
+Ditemukan **{anomaly_count:,}** data anomali turbidity, yang menunjukkan adanya lonjakan kekeruhan air
+pada waktu tertentu. Analisis hubungan antar parameter menunjukkan bahwa kecepatan arus dan suhu dapat digunakan
+untuk memahami perubahan kondisi perairan, meskipun kekuatan hubungannya perlu dilihat dari nilai korelasi.
+
+Parameter yang paling sering memicu warning adalah **{top_warning_param}**, sehingga parameter tersebut perlu
+menjadi prioritas dalam sistem pemantauan. Secara keseluruhan, dashboard ini dapat digunakan sebagai ringkasan
+insight utama dan dasar pengambilan keputusan untuk pengembangan sistem early warning kualitas air.
+"""
+)
+
+st.success("Dashboard selesai ditampilkan.")
